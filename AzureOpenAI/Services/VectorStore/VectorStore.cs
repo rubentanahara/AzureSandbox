@@ -1,13 +1,10 @@
-
-using AzureOpenAI.Models;
-
 namespace AzureOpenAI.Services.VectorStore;
 
-public class InMemoryVectorStore : IVectorStore
+public class InMemoryVectorStore<TMetadata> : IVectorStore<TMetadata> where TMetadata : class
 {
     private readonly List<VectorEntry> _entries = [];
 
-    public Task UpsertAsync(string id, ReadOnlyMemory<float> embedding, SupportTicket metadata)
+    public Task UpsertAsync(string id, ReadOnlyMemory<float> embedding, TMetadata metadata)
     {
         VectorEntry? existing = _entries.FirstOrDefault(e => e.Id == id);
         if (existing != null)
@@ -25,17 +22,17 @@ public class InMemoryVectorStore : IVectorStore
         return Task.CompletedTask;
     }
 
-    public Task<List<SupportTicket>> SearchAsync(ReadOnlyMemory<float> queryEmbedding, int topK)
+    public Task<List<TMetadata>> SearchAsync(ReadOnlyMemory<float> queryEmbedding, int topK)
     {
         var results = _entries
             .Select(entry => new
             {
-                Ticket = entry.Metadata,
+                Metadata = entry.Metadata,
                 Similarity = CosineSimilarity(queryEmbedding, entry.Embedding)
             })
             .OrderByDescending(x => x.Similarity)
             .Take(topK)
-            .Select(x => x.Ticket)
+            .Select(x => x.Metadata)
             .ToList();
 
         return Task.FromResult(results);
@@ -61,6 +58,6 @@ public class InMemoryVectorStore : IVectorStore
     {
         public string Id { get; set; } = string.Empty;
         public ReadOnlyMemory<float> Embedding { get; set; }
-        public SupportTicket Metadata { get; set; } = null!;
+        public TMetadata Metadata { get; set; } = default!;
     }
 }

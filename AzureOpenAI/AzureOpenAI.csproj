@@ -12,10 +12,15 @@
     <PackageReference Include="Microsoft.SemanticKernel" Version="1.68.0" />
     <PackageReference Include="Microsoft.SemanticKernel.Connectors.AzureOpenAI" Version="1.68.0" />
     <PackageReference Include="Microsoft.SemanticKernel.Connectors.InMemory" Version="1.68.0-preview" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.0" />
+    <PackageReference Include="YamlDotNet" Version="16.2.0" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.1" />
+    <PackageReference Include="ModelContextProtocol" Version="0.4.1-preview.1" />
   </ItemGroup>
 
   <ItemGroup>
     <Compile Remove="Services/MCP/McpServer/**/*.cs" />
+    <Compile Remove="Features/MCP/McpServer/**/*.cs" />
   </ItemGroup>
 
 </Project>

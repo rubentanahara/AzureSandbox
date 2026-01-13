@@ -3,19 +3,17 @@ using AzureOpenAI.Services.VectorStore;
 
 using Microsoft.Extensions.AI;
 using Microsoft.SemanticKernel.ChatCompletion;
-using Microsoft.SemanticKernel.Embeddings;
 
-
-namespace AzureOpenAI.Services.RAG;
+namespace AzureOpenAI.Features.RAG;
 
 public class RagService(
     IChatCompletionService chatService,
     IEmbeddingGenerator<string, Embedding<float>> embeddingService,
-    IVectorStore vectorStore)
+    IVectorStore<SupportTicket> vectorStore)
 {
     private readonly IChatCompletionService _chatService = chatService;
     private readonly IEmbeddingGenerator<string, Embedding<float>> _embeddingService = embeddingService;
-    private readonly IVectorStore _vectorStore = vectorStore;
+    private readonly IVectorStore<SupportTicket> _vectorStore = vectorStore;
     private readonly List<SupportTicket> _tickets = SampleTickets.GetSampleData();
 
     public async Task IndexTicketsAsync()

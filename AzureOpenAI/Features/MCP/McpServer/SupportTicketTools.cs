@@ -1,9 +1,12 @@
 using System.ComponentModel;
 using System.Text.Json;
+
 using AzureOpenAI.Models;
+using AzureOpenAI.Data;
+
 using ModelContextProtocol.Server;
 
-namespace AzureOpenAI.McpServer;
+namespace AzureOpenAI.Features.MCP.McpServer;
 
 /// <summary>
 /// Support Ticket MCP Tools
@@ -12,15 +15,22 @@ namespace AzureOpenAI.McpServer;
 [McpServerToolType]
 public static class SupportTicketTools
 {
-    private static readonly List<SupportTicket> _tickets = SampleTickets.GetSampleData();
-    private static int _nextTicketId = 2000;
+    private static TicketRepository? _repository;
+
+    public static void Initialize(TicketRepository repository)
+    {
+        _repository = repository;
+    }
 
     [McpServerTool]
     [Description("Get a specific ticket by ID")]
     public static string GetTicketById(
         [Description("The ticket ID")] int ticketId)
     {
-        var ticket = _tickets.FirstOrDefault(t => t.Id == ticketId);
+        if (_repository == null)
+            return JsonSerializer.Serialize(new { error = "Repository not initialized" });
+
+        var ticket = _repository.GetTicketByIdAsync(ticketId).GetAwaiter().GetResult();
         return ticket != null
             ? JsonSerializer.Serialize(ticket)
             : JsonSerializer.Serialize(new { error = "Ticket not found" });
@@ -31,9 +41,12 @@ public static class SupportTicketTools
     public static string FilterByStatus(
         [Description("Status: Open, InProgress, Waiting, Resolved, Closed")] string status)
     {
+        if (_repository == null)
+            return JsonSerializer.Serialize(new { error = "Repository not initialized" });
+
         if (Enum.TryParse<TicketStatus>(status, true, out var ticketStatus))
         {
-            var results = _tickets.Where(t => t.Status == ticketStatus).ToList();
+            var results = _repository.GetTicketsByStatusAsync(ticketStatus).GetAwaiter().GetResult();
             return JsonSerializer.Serialize(results);
         }
         return "[]";
@@ -44,9 +57,12 @@ public static class SupportTicketTools
     public static string FilterByPriority(
         [Description("Priority: Low, Medium, High, Critical")] string priority)
     {
+        if (_repository == null)
+            return JsonSerializer.Serialize(new { error = "Repository not initialized" });
+
         if (Enum.TryParse<TicketPriority>(priority, true, out var ticketPriority))
         {
-            var results = _tickets.Where(t => t.Priority == ticketPriority).ToList();
+            var results = _repository.GetTicketsByPriorityAsync(ticketPriority).GetAwaiter().GetResult();
             return JsonSerializer.Serialize(results);
         }
         return "[]";
@@ -57,8 +73,10 @@ public static class SupportTicketTools
     public static string FilterByCategory(
         [Description("Category: Billing, Technical, Account")] string category)
     {
-        var results = _tickets.Where(t =>
-            t.Category.Equals(category, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (_repository == null)
+            return JsonSerializer.Serialize(new { error = "Repository not initialized" });
+
+        var results = _repository.GetTicketsByCategoryAsync(category).GetAwaiter().GetResult();
         return JsonSerializer.Serialize(results);
     }
 
@@ -67,9 +85,12 @@ public static class SupportTicketTools
     public static string GetTicketsAfterDate(
         [Description("Date in yyyy-MM-dd format")] string date)
     {
+        if (_repository == null)
+            return JsonSerializer.Serialize(new { error = "Repository not initialized" });
+
         if (DateTime.TryParse(date, out var parsedDate))
         {
-            var results = _tickets.Where(t => t.CreatedAt >= parsedDate).ToList();
+            var results = _repository.GetTicketsAfterDateAsync(parsedDate).GetAwaiter().GetResult();
             return JsonSerializer.Serialize(results);
         }
         return "[]";
@@ -80,8 +101,10 @@ public static class SupportTicketTools
     public static string SearchByTag(
         [Description("Tag to search for")] string tag)
     {
-        var results = _tickets.Where(t =>
-            t.Tags.Any(tg => tg.Equals(tag, StringComparison.OrdinalIgnoreCase))).ToList();
+        if (_repository == null)
+            return JsonSerializer.Serialize(new { error = "Repository not initialized" });
+
+        var results = _repository.SearchByTagAsync(tag).GetAwaiter().GetResult();
         return JsonSerializer.Serialize(results);
     }
 
@@ -89,17 +112,23 @@ public static class SupportTicketTools
     [Description("Get all tickets")]
     public static string GetAllTickets()
     {
-        return JsonSerializer.Serialize(_tickets);
+        if (_repository == null)
+            return JsonSerializer.Serialize(new { error = "Repository not initialized" });
+
+        var results = _repository.GetAllTicketsAsync().GetAwaiter().GetResult();
+        return JsonSerializer.Serialize(results);
     }
 
     [McpServerTool]
     [Description("Get ticket count by status")]
     public static string GetTicketCountByStatus()
     {
-        var counts = _tickets.GroupBy(t => t.Status)
-            .Select(g => new { Status = g.Key.ToString(), Count = g.Count() })
-            .ToList();
-        return JsonSerializer.Serialize(counts);
+        if (_repository == null)
+            return JsonSerializer.Serialize(new { error = "Repository not initialized" });
+
+        var counts = _repository.GetTicketCountByStatusAsync().GetAwaiter().GetResult();
+        var result = counts.Select(kvp => new { Status = kvp.Key.ToString(), Count = kvp.Value }).ToList();
+        return JsonSerializer.Serialize(result);
     }
 
     [McpServerTool]
@@ -115,6 +144,9 @@ public static class SupportTicketTools
     {
         try
         {
+            if (_repository == null)
+                return JsonSerializer.Serialize(new { error = "Repository not initialized" });
+
             if (!Enum.TryParse<TicketPriority>(priority, true, out var ticketPriority))
             {
                 return JsonSerializer.Serialize(new { error = $"Invalid priority: {priority}. Use Low, Medium, High, or Critical" });
@@ -122,7 +154,6 @@ public static class SupportTicketTools
 
             var newTicket = new SupportTicket
             {
-                Id = _nextTicketId++,
                 Title = title,
                 Description = description,
                 Category = category,
@@ -130,13 +161,16 @@ public static class SupportTicketTools
                 Status = TicketStatus.Open,
                 CustomerEmail = customerEmail,
                 CustomerId = customerId,
-                CreatedAt = DateTime.Now,
+                CreatedAt = DateTime.UtcNow,
                 Tags = string.IsNullOrWhiteSpace(tags)
                     ? new List<string>()
-                    : tags.Split(',').Select(t => t.Trim()).ToList()
+                    : tags.Split(',').Select(t => t.Trim()).ToList(),
+                Resolution = string.Empty,
+                AssignedTo = string.Empty
             };
 
-            _tickets.Add(newTicket);
+            var ticketId = _repository.CreateTicketAsync(newTicket).GetAwaiter().GetResult();
+            newTicket.Id = ticketId;
 
             return JsonSerializer.Serialize(new
             {
@@ -162,7 +196,10 @@ public static class SupportTicketTools
     {
         try
         {
-            var ticket = _tickets.FirstOrDefault(t => t.Id == ticketId);
+            if (_repository == null)
+                return JsonSerializer.Serialize(new { error = "Repository not initialized" });
+
+            var ticket = _repository.GetTicketByIdAsync(ticketId).GetAwaiter().GetResult();
             if (ticket == null)
             {
                 return JsonSerializer.Serialize(new { error = $"Ticket {ticketId} not found" });
@@ -174,11 +211,7 @@ public static class SupportTicketTools
             {
                 if (Enum.TryParse<TicketStatus>(status, true, out var ticketStatus))
                 {
-                    ticket.Status = ticketStatus;
-                    if (ticketStatus == TicketStatus.Resolved || ticketStatus == TicketStatus.Closed)
-                    {
-                        ticket.ResolvedAt = DateTime.Now;
-                    }
+                    _repository.UpdateTicketStatusAsync(ticketId, ticketStatus, resolution).GetAwaiter().GetResult();
                     updated = true;
                 }
                 else
@@ -187,28 +220,9 @@ public static class SupportTicketTools
                 }
             }
 
-            if (!string.IsNullOrWhiteSpace(priority))
-            {
-                if (Enum.TryParse<TicketPriority>(priority, true, out var ticketPriority))
-                {
-                    ticket.Priority = ticketPriority;
-                    updated = true;
-                }
-                else
-                {
-                    return JsonSerializer.Serialize(new { error = $"Invalid priority: {priority}" });
-                }
-            }
-
             if (!string.IsNullOrWhiteSpace(assignedTo))
             {
-                ticket.AssignedTo = assignedTo;
-                updated = true;
-            }
-
-            if (!string.IsNullOrWhiteSpace(resolution))
-            {
-                ticket.Resolution = resolution;
+                _repository.AssignTicketAsync(ticketId, assignedTo).GetAwaiter().GetResult();
                 updated = true;
             }
 
@@ -217,11 +231,14 @@ public static class SupportTicketTools
                 return JsonSerializer.Serialize(new { error = "No fields to update were provided" });
             }
 
+            // Get updated ticket
+            var updatedTicket = _repository.GetTicketByIdAsync(ticketId).GetAwaiter().GetResult();
+
             return JsonSerializer.Serialize(new
             {
                 success = true,
                 message = $"Ticket {ticketId} updated successfully",
-                ticket
+                ticket = updatedTicket
             });
         }
         catch (Exception ex)

@@ -2,7 +2,7 @@ using System.ComponentModel;
 
 using Microsoft.SemanticKernel;
 
-namespace AzureOpenAI.Services.MCP;
+namespace AzureOpenAI.Features.MCP;
 
 /// <summary>
 /// Semantic Kernel plugin that bridges to MCP Server tools

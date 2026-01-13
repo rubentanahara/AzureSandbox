@@ -1,3 +1,0 @@
-1
-Find tickets about authentication problems
-exit

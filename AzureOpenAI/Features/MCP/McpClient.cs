@@ -6,12 +6,12 @@ using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.Connectors.OpenAI;
 
-namespace AzureOpenAI.Services.MCP;
+namespace AzureOpenAI.Features.MCP;
 
-public class McpClient : IDisposable
+public class McpClient(Kernel kernel, IChatCompletionService chatService) : IDisposable
 {
-    private readonly Kernel _kernel;
-    private readonly IChatCompletionService _chatService;
+    private readonly Kernel _kernel = kernel;
+    private readonly IChatCompletionService _chatService = chatService;
     private Process? _mcpServerProcess;
     private StreamWriter? _serverStdin;
     private StreamReader? _serverStdout;
@@ -21,12 +21,6 @@ public class McpClient : IDisposable
     private readonly List<ToolDefinition> _availableTools = [];
 
     public int ToolCount => _availableTools.Count;
-
-    public McpClient(Kernel kernel, IChatCompletionService chatService)
-    {
-        _kernel = kernel;
-        _chatService = chatService;
-    }
 
     public async Task InitializeAsync()
     {
@@ -54,7 +48,6 @@ public class McpClient : IDisposable
         _serverStdout = _mcpServerProcess.StandardOutput;
         _serverStderr = _mcpServerProcess.StandardError;
 
-        // Read stderr in background for logging
         _stderrReaderTask = Task.Run(async () =>
         {
             while (!_mcpServerProcess.HasExited)
@@ -105,7 +98,6 @@ public class McpClient : IDisposable
 
         Console.WriteLine($"✅ MCP Server initialized with {_availableTools.Count} tools");
 
-        // Register MCP tools with Semantic Kernel using plugin class
         var mcpPlugin = new McpToolsPlugin(this);
         _kernel.Plugins.AddFromObject(mcpPlugin, "McpTools");
         Console.WriteLine($"✅ Registered {_availableTools.Count} MCP tools with LLM");
@@ -119,12 +111,12 @@ public class McpClient : IDisposable
         // Build chat with user query
         var chatHistory = new ChatHistory();
         chatHistory.AddSystemMessage("""
-            You are a support ticket assistant with access to MCP tools for querying tickets.
+        You are a support ticket assistant with access to MCP tools for querying tickets.
 
-            Use the available tools to answer user questions accurately.
-            Always call the appropriate tool based on what the user is asking for.
-            After getting results, provide a clear, helpful summary to the user.
-            """);
+        Use the available tools to answer user questions accurately.
+        Always call the appropriate tool based on what the user is asking for.
+        After getting results, provide a clear, helpful summary to the user.
+        """);
         chatHistory.AddUserMessage(query);
 
         // Let LLM automatically invoke MCP tools via Semantic Kernel
@@ -192,10 +184,35 @@ public class McpClient : IDisposable
         await _serverStdin.WriteLineAsync(requestJson);
         await _serverStdin.FlushAsync();
 
-        var responseJson = await _serverStdout.ReadLineAsync();
-        // Console.WriteLine($"  📥 MCP Response: {responseJson}");
+        // Read lines until we find a valid JSON-RPC response
+        // (skips any console output from the server)
+        while (true)
+        {
+            var responseJson = await _serverStdout.ReadLineAsync();
 
-        return string.IsNullOrEmpty(responseJson) ? null : JsonNode.Parse(responseJson);
+            if (string.IsNullOrEmpty(responseJson))
+            {
+                return null;
+            }
+
+            // Skip lines that don't look like JSON
+            if (!responseJson.TrimStart().StartsWith("{"))
+            {
+                Console.WriteLine($"[MCP] {responseJson}");
+                continue;
+            }
+
+            try
+            {
+                return JsonNode.Parse(responseJson);
+            }
+            catch (JsonException)
+            {
+                // Not valid JSON, log it and continue reading
+                Console.WriteLine($"[MCP] {responseJson}");
+                continue;
+            }
+        }
     }
 
     private static string FindMcpServerExecutable()
@@ -209,7 +226,7 @@ public class McpClient : IDisposable
         }
 
         // Development mode - use the project directly
-        var projectPath = Path.Combine(Directory.GetCurrentDirectory(), "Services", "MCP", "McpServer", "AzureOpenAI.McpServer.csproj");
+        var projectPath = Path.Combine(Directory.GetCurrentDirectory(), "Features", "MCP", "McpServer", "AzureOpenAI.McpServer.csproj");
         if (File.Exists(projectPath))
         {
             return $"run --project \"{projectPath}\"";

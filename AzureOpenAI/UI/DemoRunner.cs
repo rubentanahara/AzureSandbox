@@ -1,27 +1,30 @@
-using AzureOpenAI.Services.Hybrid;
-using AzureOpenAI.Services.MCP;
-using AzureOpenAI.Services.RAG;
+using AzureOpenAI.Features.Hybrid;
+using AzureOpenAI.Features.MCP;
+using AzureOpenAI.Features.RAG;
 
 namespace AzureOpenAI.UI;
 
 public static class DemoRunner
 {
-    public static async Task RunRAGDemo(RagService ragService)
+    public static async Task RunKnowledgeRAGDemo(KnowledgeRagService knowledgeRagService)
     {
-        Console.WriteLine("\n🔍 RAG (Retrieval-Augmented Generation) Mode");
+        Console.WriteLine("\n📚 Knowledge Base RAG Mode");
         Console.WriteLine("════════════════════════════════════════════════");
-        Console.WriteLine("Using vector embeddings to find semantically similar tickets");
+        Console.WriteLine("Using vector embeddings to search IT knowledge base");
         Console.WriteLine();
 
-        Console.WriteLine("📥 Indexing tickets...");
-        await ragService.IndexTicketsAsync();
+        Console.WriteLine("📥 Indexing knowledge base from markdown files...");
+        var markdownPath = Path.Combine(Directory.GetCurrentDirectory(), "Data", "KnowledgeBase");
+        await knowledgeRagService.IndexKnowledgeBaseFromMarkdownAsync(markdownPath);
 
         Console.WriteLine("\n💡 Try queries like:");
-        Console.WriteLine("  • 'Find tickets about authentication problems'");
-        Console.WriteLine("  • 'Show me billing issues'");
-        Console.WriteLine("  • 'What problems are users having with login?'");
+        Console.WriteLine("  • 'How do I reset a password?'");
+        Console.WriteLine("  • 'VPN troubleshooting steps'");
+        Console.WriteLine("  • 'What is the software installation policy?'");
+        Console.WriteLine("  • 'How to set up MFA?'");
+        Console.WriteLine("  • 'Laptop is running slow, what should I do?'");
 
-        await RunInteractiveLoop(ragService.SearchTicketsAsync);
+        await RunInteractiveLoop(knowledgeRagService.GetKnowledgeAnswerAsync);
     }
 
     public static async Task RunMCPDemo(McpClient mcpClient)
@@ -48,24 +51,26 @@ public static class DemoRunner
 
     public static async Task RunHybridDemo(HybridQueryService hybridService)
     {
-        Console.WriteLine("\n🔀 HYBRID Mode (RAG + MCP)");
+        Console.WriteLine("\n🔀 HYBRID Mode (Knowledge Base + Ticket Management)");
         Console.WriteLine("════════════════════════════════════════════════");
-        Console.WriteLine("LLM intelligently selects RAG and/or MCP tools based on query");
+        Console.WriteLine("LLM intelligently uses Knowledge Base for help and MCP tools for tickets");
         Console.WriteLine();
 
         await hybridService.InitializeAsync();
 
-        Console.WriteLine("\n💡 Try queries that combine semantic and structured aspects:");
-        Console.WriteLine("\n  Semantic queries (uses RAG):");
-        Console.WriteLine("    • 'What authentication problems are users having?'");
-        Console.WriteLine("    • 'Show me billing complaints'");
-        Console.WriteLine("\n  Structured queries (uses MCP):");
+        Console.WriteLine("\n💡 Try these types of queries:");
+        Console.WriteLine("\n  Knowledge Base queries (how-to, troubleshooting):");
+        Console.WriteLine("    • 'How do I reset a user password?'");
+        Console.WriteLine("    • 'VPN won't connect, what should I do?'");
+        Console.WriteLine("    • 'What's the software installation policy?'");
+        Console.WriteLine("    • 'How to troubleshoot email issues?'");
+        Console.WriteLine("\n  Ticket Management queries:");
         Console.WriteLine("    • 'Show all critical priority tickets'");
-        Console.WriteLine("    • 'What tickets are open?'");
-        Console.WriteLine("\n  Hybrid queries (uses BOTH):");
-        Console.WriteLine("    • 'Critical authentication problems'");
-        Console.WriteLine("    • 'Open billing issues'");
-        Console.WriteLine("    • 'High priority login problems created recently'");
+        Console.WriteLine("    • 'Create a ticket for printer issue on Floor 2'");
+        Console.WriteLine("    • 'What tickets are open in the Technical category?'");
+        Console.WriteLine("\n  Combined queries (both knowledge + tickets):");
+        Console.WriteLine("    • 'Help me fix VPN issues and create a ticket'");
+        Console.WriteLine("    • 'Show me password reset procedure and related open tickets'");
 
         await RunInteractiveLoop(hybridService.QueryTicketsAsync);
     }
@@ -81,7 +86,10 @@ public static class DemoRunner
             if (string.IsNullOrWhiteSpace(query) || query.Equals("exit", StringComparison.OrdinalIgnoreCase))
                 break;
 
-            await queryHandler(query);
+            var response = await queryHandler(query);
+
+            Console.WriteLine("\n📝 Response:");
+            Console.WriteLine(response);
         }
 
         Console.WriteLine("\n👋 Goodbye!");

@@ -1,4 +1,5 @@
 ﻿using AzureOpenAI.UI;
+using AzureOpenAI.Models;
 
 using Microsoft.Extensions.AI;
 using Microsoft.SemanticKernel;
@@ -10,6 +11,11 @@ string endpoint = "https://open-ai-sandbox-1234.openai.azure.com";
 string chatDeploymentName = "o4-mini";
 string embeddingDeploymentName = "text-embedding-3-small";
 
+Console.WriteLine("🔧 Initializing Azure OpenAI...");
+Console.WriteLine($"   Endpoint: {endpoint}");
+Console.WriteLine($"   Chat Model: {chatDeploymentName}");
+Console.WriteLine($"   Embedding Model: {embeddingDeploymentName}");
+
 Kernel kernel = Kernel.CreateBuilder()
     .AddAzureOpenAIChatCompletion(chatDeploymentName, endpoint, apiKey)
     .AddAzureOpenAIEmbeddingGenerator(embeddingDeploymentName, endpoint, apiKey)
@@ -17,7 +23,9 @@ Kernel kernel = Kernel.CreateBuilder()
 
 IChatCompletionService chatService = kernel.GetRequiredService<IChatCompletionService>();
 IEmbeddingGenerator<string, Embedding<float>> embeddingService = kernel.GetRequiredService<IEmbeddingGenerator<string, Embedding<float>>>();
-InMemoryVectorStore vectorStore = new();
 
-ConsoleUI consoleApp = new(kernel, chatService, embeddingService, vectorStore);
+var knowledgeVectorStore = new InMemoryVectorStore<KnowledgeDocument>();
+var ticketVectorStore = new InMemoryVectorStore<SupportTicket>();
+
+ConsoleUI consoleApp = new(kernel, chatService, embeddingService, knowledgeVectorStore, ticketVectorStore);
 await consoleApp.RunAsync();

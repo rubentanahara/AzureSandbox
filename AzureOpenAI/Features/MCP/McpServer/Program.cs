@@ -2,20 +2,21 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
-namespace AzureOpenAI.McpServer;
+using AzureOpenAI.Data;
 
-/// <summary>
-/// MCP Server for Support Ticket Tools
-/// Uses the official Model Context Protocol C# SDK
-/// Communicates via JSON-RPC over stdin/stdout
-/// </summary>
+namespace AzureOpenAI.Features.MCP.McpServer;
+
 public class Program
 {
     public static async Task Main(string[] args)
     {
+        var repository = new TicketRepository("tickets.db");
+        await repository.InitializeAsync();
+        await repository.SeedSampleDataAsync();
+        SupportTicketTools.Initialize(repository);
+
         var builder = Host.CreateApplicationBuilder(args);
 
-        // Configure logging to stderr so it doesn't interfere with JSON-RPC on stdout
         builder.Logging.AddConsole(consoleLogOptions =>
         {
             consoleLogOptions.LogToStandardErrorThreshold = LogLevel.Trace;
@@ -27,5 +28,7 @@ public class Program
             .WithToolsFromAssembly();
 
         await builder.Build().RunAsync();
+
+        repository.Dispose();
     }
 }
