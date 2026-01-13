@@ -1,3 +1,5 @@
+using AzureOpenAI.Services.MCP;
+using AzureOpenAI.Services.RAG;
 using AzureOpenAI.Services.VectorStore;
 
 using Microsoft.Extensions.AI;
@@ -9,13 +11,16 @@ namespace AzureOpenAI.UI;
 public class ConsoleUI(
     Kernel kernel,
     IChatCompletionService chatService,
-    IEmbeddingGenerator embeddingService,
+    IEmbeddingGenerator<string, Embedding<float>> embeddingService,
     IVectorStore vectorStore)
 {
     private readonly Kernel _kernel = kernel;
     private readonly IChatCompletionService _chatService = chatService;
-    private readonly IEmbeddingGenerator _embeddingService = embeddingService;
+    private readonly IEmbeddingGenerator<string, Embedding<float>> _embeddingService = embeddingService;
     private readonly IVectorStore _vectorStore = vectorStore;
+
+    private RagService? _ragService;
+    private McpClient? _mcpClient;
 
     public async Task RunAsync()
     {
@@ -28,22 +33,18 @@ public class ConsoleUI(
         {
             case "RAG":
             case "1":
-                await DemoRunner.RunRAGDemo(_chatService, _embeddingService, _vectorStore);
+                _ragService ??= new RagService(_chatService, _embeddingService, _vectorStore);
+                await DemoRunner.RunRAGDemo(_ragService);
                 break;
 
             case "MCP":
             case "2":
-                await DemoRunner.RunMCPDemo(_kernel, _chatService);
-                break;
-
-            case "HYBRID":
-            case "3":
-                await DemoRunner.RunHybridDemo(_kernel, _chatService, _embeddingService, _vectorStore);
-                break;
-
-            case "DEMO":
-            case "4":
-                await DemoRunner.RunFullDemo(_kernel, _chatService, _embeddingService, _vectorStore);
+                if (_mcpClient == null)
+                {
+                    _mcpClient = new McpClient(_kernel, _chatService);
+                    await _mcpClient.InitializeAsync();
+                }
+                await DemoRunner.RunMCPDemo(_mcpClient);
                 break;
 
             default:
@@ -56,7 +57,7 @@ public class ConsoleUI(
     {
         Console.Clear();
         Console.WriteLine("╔════════════════════════════════════════════════════════╗");
-        Console.WriteLine("║   Support Ticket System - RAG vs MCP vs HYBRID Demo  ║");
+        Console.WriteLine("║      Support Ticket System - RAG vs MCP Demo         ║");
         Console.WriteLine("╚════════════════════════════════════════════════════════╝");
         Console.WriteLine();
     }
@@ -65,11 +66,12 @@ public class ConsoleUI(
     {
         Console.WriteLine("Select a mode to run:");
         Console.WriteLine();
-        Console.WriteLine("  1. RAG     - Semantic search using vector embeddings");
-        Console.WriteLine("  2. MCP     - Structured queries using function calling");
-        Console.WriteLine("  3. HYBRID  - Combined RAG + MCP approach");
-        Console.WriteLine("  4. DEMO    - Run all three with comparison");
+        Console.WriteLine("  1. RAG - Semantic search using vector embeddings");
+        Console.WriteLine("           Best for: Conceptual queries, natural language");
         Console.WriteLine();
-        Console.Write("Enter your choice (1-4 or RAG/MCP/HYBRID/DEMO): ");
+        Console.WriteLine("  2. MCP - LLM-powered structured queries via MCP protocol");
+        Console.WriteLine("           Best for: Exact filtering, specific criteria");
+        Console.WriteLine();
+        Console.Write("Enter your choice (1-2 or RAG/MCP): ");
     }
 }

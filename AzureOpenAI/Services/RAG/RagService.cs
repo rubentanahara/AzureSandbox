@@ -8,23 +8,15 @@ using Microsoft.SemanticKernel.Embeddings;
 
 namespace AzureOpenAI.Services.RAG;
 
-public class RagService
+public class RagService(
+    IChatCompletionService chatService,
+    IEmbeddingGenerator<string, Embedding<float>> embeddingService,
+    IVectorStore vectorStore)
 {
-    private readonly IChatCompletionService _chatService;
-    private readonly IEmbeddingGenerator _embeddingService;
-    private readonly IVectorStore _vectorStore;
-    private readonly List<SupportTicket> _tickets;
-
-    public RagService(
-        IChatCompletionService chatService,
-        IEmbeddingGenerator embeddingService,
-        IVectorStore vectorStore)
-    {
-        _chatService = chatService;
-        _embeddingService = embeddingService;
-        _vectorStore = vectorStore;
-        _tickets = SampleTickets.GetSampleData();
-    }
+    private readonly IChatCompletionService _chatService = chatService;
+    private readonly IEmbeddingGenerator<string, Embedding<float>> _embeddingService = embeddingService;
+    private readonly IVectorStore _vectorStore = vectorStore;
+    private readonly List<SupportTicket> _tickets = SampleTickets.GetSampleData();
 
     public async Task IndexTicketsAsync()
     {
@@ -41,10 +33,10 @@ public class RagService
                 Created: {ticket.CreatedAt:yyyy-MM-dd HH:mm}
                 """;
 
-            var embeddings = await _embeddingService.GenerateEmbeddingsAsync([text]);
+            var embeddings = await _embeddingService.GenerateAsync([text]);
             await _vectorStore.UpsertAsync(
                 ticket.Id.ToString(),
-                embeddings[0],
+                embeddings[0].Vector,
                 ticket
             );
         }
@@ -57,14 +49,12 @@ public class RagService
         Console.WriteLine($"\n🔍 RAG Search: \"{query}\"");
         Console.WriteLine("─────────────────────────────────────");
 
-        // Generate embedding for query
-        var queryEmbeddings = await _embeddingService.GenerateEmbeddingsAsync([query]);
-        var queryEmbedding = queryEmbeddings[0];
+        var queryEmbeddings = await _embeddingService.GenerateAsync([query]);
+        var queryEmbedding = queryEmbeddings[0].Vector;
 
-        // Search vector store
         var similarTickets = await _vectorStore.SearchAsync(queryEmbedding, topK: 3);
 
-        if (!similarTickets.Any())
+        if (similarTickets.Count == 0)
         {
             Console.WriteLine("❌ No relevant tickets found.");
             return "No relevant tickets found.";

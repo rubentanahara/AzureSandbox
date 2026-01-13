@@ -14,4 +14,8 @@
     <PackageReference Include="Microsoft.SemanticKernel.Connectors.InMemory" Version="1.68.0-preview" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Remove="Services/MCP/McpServer/**/*.cs" />
+  </ItemGroup>
+
 </Project>

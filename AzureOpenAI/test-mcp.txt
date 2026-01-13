@@ -1,0 +1,3 @@
+2
+Show all critical priority tickets
+exit
