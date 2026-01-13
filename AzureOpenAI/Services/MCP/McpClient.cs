@@ -20,6 +20,8 @@ public class McpClient : IDisposable
     private int _requestId = 0;
     private readonly List<ToolDefinition> _availableTools = [];
 
+    public int ToolCount => _availableTools.Count;
+
     public McpClient(Kernel kernel, IChatCompletionService chatService)
     {
         _kernel = kernel;
@@ -191,7 +193,7 @@ public class McpClient : IDisposable
         await _serverStdin.FlushAsync();
 
         var responseJson = await _serverStdout.ReadLineAsync();
-        Console.WriteLine($"  📥 MCP Response: {responseJson}");
+        // Console.WriteLine($"  📥 MCP Response: {responseJson}");
 
         return string.IsNullOrEmpty(responseJson) ? null : JsonNode.Parse(responseJson);
     }

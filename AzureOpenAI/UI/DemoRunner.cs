@@ -1,3 +1,4 @@
+using AzureOpenAI.Services.Hybrid;
 using AzureOpenAI.Services.MCP;
 using AzureOpenAI.Services.RAG;
 
@@ -43,6 +44,30 @@ public static class DemoRunner
         Console.WriteLine("    • 'Mark ticket 1003 as resolved'");
 
         await RunInteractiveLoop(mcpClient.QueryTicketsAsync);
+    }
+
+    public static async Task RunHybridDemo(HybridQueryService hybridService)
+    {
+        Console.WriteLine("\n🔀 HYBRID Mode (RAG + MCP)");
+        Console.WriteLine("════════════════════════════════════════════════");
+        Console.WriteLine("LLM intelligently selects RAG and/or MCP tools based on query");
+        Console.WriteLine();
+
+        await hybridService.InitializeAsync();
+
+        Console.WriteLine("\n💡 Try queries that combine semantic and structured aspects:");
+        Console.WriteLine("\n  Semantic queries (uses RAG):");
+        Console.WriteLine("    • 'What authentication problems are users having?'");
+        Console.WriteLine("    • 'Show me billing complaints'");
+        Console.WriteLine("\n  Structured queries (uses MCP):");
+        Console.WriteLine("    • 'Show all critical priority tickets'");
+        Console.WriteLine("    • 'What tickets are open?'");
+        Console.WriteLine("\n  Hybrid queries (uses BOTH):");
+        Console.WriteLine("    • 'Critical authentication problems'");
+        Console.WriteLine("    • 'Open billing issues'");
+        Console.WriteLine("    • 'High priority login problems created recently'");
+
+        await RunInteractiveLoop(hybridService.QueryTicketsAsync);
     }
 
     private static async Task RunInteractiveLoop(Func<string, Task<string>> queryHandler)

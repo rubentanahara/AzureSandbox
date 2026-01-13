@@ -1,3 +1,4 @@
+using AzureOpenAI.Services.Hybrid;
 using AzureOpenAI.Services.MCP;
 using AzureOpenAI.Services.RAG;
 using AzureOpenAI.Services.VectorStore;
@@ -47,6 +48,17 @@ public class ConsoleUI(
                 await DemoRunner.RunMCPDemo(_mcpClient);
                 break;
 
+            case "HYBRID":
+            case "3":
+                _ragService ??= new RagService(_chatService, _embeddingService, _vectorStore);
+                if (_mcpClient == null)
+                {
+                    _mcpClient = new McpClient(_kernel, _chatService);
+                }
+                var hybridService = new HybridQueryService(_kernel, _chatService, _ragService, _mcpClient);
+                await DemoRunner.RunHybridDemo(hybridService);
+                break;
+
             default:
                 Console.WriteLine("❌ Invalid selection. Please run the program again.");
                 break;
@@ -72,6 +84,9 @@ public class ConsoleUI(
         Console.WriteLine("  2. MCP - LLM-powered structured queries via MCP protocol");
         Console.WriteLine("           Best for: Exact filtering, specific criteria");
         Console.WriteLine();
-        Console.Write("Enter your choice (1-2 or RAG/MCP): ");
+        Console.WriteLine("  3. HYBRID - Intelligent combination of RAG + MCP");
+        Console.WriteLine("              Best for: Complex queries with both semantic and structured aspects");
+        Console.WriteLine();
+        Console.Write("Enter your choice (1-3 or RAG/MCP/HYBRID): ");
     }
 }

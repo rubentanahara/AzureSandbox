@@ -44,15 +44,19 @@ public class RagService(
         Console.WriteLine($"✅ Indexed {_tickets.Count} tickets into vector store");
     }
 
+    public async Task<List<SupportTicket>> SearchTicketsInternalAsync(string query, int topK = 3)
+    {
+        var queryEmbeddings = await _embeddingService.GenerateAsync([query]);
+        var queryEmbedding = queryEmbeddings[0].Vector;
+        return await _vectorStore.SearchAsync(queryEmbedding, topK);
+    }
+
     public async Task<string> SearchTicketsAsync(string query)
     {
         Console.WriteLine($"\n🔍 RAG Search: \"{query}\"");
         Console.WriteLine("─────────────────────────────────────");
 
-        var queryEmbeddings = await _embeddingService.GenerateAsync([query]);
-        var queryEmbedding = queryEmbeddings[0].Vector;
-
-        var similarTickets = await _vectorStore.SearchAsync(queryEmbedding, topK: 3);
+        var similarTickets = await SearchTicketsInternalAsync(query);
 
         if (similarTickets.Count == 0)
         {
