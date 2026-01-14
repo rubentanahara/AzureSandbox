@@ -225,7 +225,6 @@ public class McpClient(Kernel kernel, IChatCompletionService chatService) : IDis
             return serverDll;
         }
 
-        // Development mode - use the project directly
         var projectPath = Path.Combine(Directory.GetCurrentDirectory(), "Features", "MCP", "McpServer", "AzureOpenAI.McpServer.csproj");
         if (File.Exists(projectPath))
         {
